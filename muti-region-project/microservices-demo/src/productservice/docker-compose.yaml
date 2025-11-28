@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  cartservice:
+    build: ./cartservice
+    ports:
+      - "5000:5000"
+    depends_on:
+      - productservice
+
+  productservice:
+    build: ./productservice
+    ports:
+      - "5001:5001"
