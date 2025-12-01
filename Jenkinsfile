@@ -194,42 +194,13 @@ pipeline {
 
     }
 
-
-stage('Archive artifacts') {
-  steps {
-    archiveArtifacts artifacts: '.image_tag, .sbom.json', allowEmptyArchive: true
-  }
-}
-
-stage('Cleanup Docker Images') {
-  steps {
-    sh '''
-      echo "Cleaning up old Docker images..."
-
-      # Remove dangling images
-      docker image prune -f
-
-      # Keep only the latest cartservice:main-* image, remove older ones
-      LATEST=$(docker images --format "{{.Repository}}:{{.Tag}}" \
-        | grep "^cartservice:main-" \
-        | sort -r \
-        | head -n1)
-
-      docker images --format "{{.Repository}}:{{.Tag}}" \
-        | grep "^cartservice:main-" \
-        | grep -v "$LATEST" \
-        | xargs -r docker rmi || true
-
-      echo "Cleanup complete. Latest image preserved: $LATEST"
-    '''
-  }
-}
-
-post {
-  success {
-    echo "Pipeline completed successfully ✅"
-  }
-  failure {
-    echo "Pipeline failed ❌"
-  }
+    post {
+        success { echo "Pipeline completed successfully ✅" }
+        failure { echo "Pipeline failed ❌" }
+        always {
+            node('any') {
+                archiveArtifacts artifacts: '.image_tag, .sbom.json', allowEmptyArchive: true
+            }
+        }
+    }
 }
