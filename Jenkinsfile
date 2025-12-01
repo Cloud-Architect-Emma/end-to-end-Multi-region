@@ -180,11 +180,15 @@ pipeline {
 
 
 
+
+
+
 post {
     success { echo "Pipeline completed successfully ✅" }
     failure { echo "Pipeline failed ❌" }
     always {
-        archiveArtifacts artifacts: '.image_tag, .sbom.json', allowEmptyArchive: true
+        node {
+            archiveArtifacts artifacts: '.image_tag, .sbom.json', allowEmptyArchive: true
+        }
     }
 }
-}  // <-- Add this closing brace if it's missing
