@@ -1,10 +1,5 @@
 pipeline {
-  agent {
-    docker {
-      image 'emmanuelacode/devops-ci:latest'
-      args '-v /var/run/docker.sock:/var/run/docker.sock'
-    }
-  }
+  agent any
 
   environment {
     AWS_DEFAULT_REGION  = "us-east-1"
@@ -36,6 +31,19 @@ pipeline {
         script {
           env.GIT_COMMIT_SHORT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
         }
+      }
+    }
+
+    stage('Tooling check') {
+      steps {
+        sh '''
+          which docker || { echo "docker not found"; exit 1; }
+          docker version || { echo "docker daemon not reachable"; exit 1; }
+          which aws    || echo "aws CLI not found (will fail on ECR steps)"
+          which kubectl|| echo "kubectl not found (K8s deploy disabled unless present)"
+          which syft   || echo "syft not found (SBOM will be skipped)"
+          which trivy  || echo "trivy not found (scan will be skipped)"
+        '''
       }
     }
 
@@ -86,7 +94,6 @@ pipeline {
         sh '''
           echo "IMAGE_TAG=$IMAGE_TAG" > .image_tag
 
-          # Build the service image (corrected path)
           docker build -t $SERVICE_NAME:$IMAGE_TAG \
             multi-region-project/microservices-demo/src/cartservice/
         '''
@@ -130,25 +137,21 @@ pipeline {
           sh '''
             IMAGE_TAG=$(cut -d'=' -f2 .image_tag)
 
-            # Create ECR repositories if missing
             aws ecr describe-repositories --region $AWS_DEFAULT_REGION --repository-names $SERVICE_NAME >/dev/null 2>&1 || \
               aws ecr create-repository --region $AWS_DEFAULT_REGION --repository-name $SERVICE_NAME
 
             aws ecr describe-repositories --region $AWS_SECOND_REGION --repository-names $SERVICE_NAME >/dev/null 2>&1 || \
               aws ecr create-repository --region $AWS_SECOND_REGION --repository-name $SERVICE_NAME
 
-            # Login to both ECR regions
             aws ecr get-login-password --region $AWS_DEFAULT_REGION | \
               docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
 
             aws ecr get-login-password --region $AWS_SECOND_REGION | \
               docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_SECOND_REGION}.amazonaws.com
 
-            # Tag the image for each region
             docker tag $SERVICE_NAME:$IMAGE_TAG $ECR_PRIMARY:$IMAGE_TAG
             docker tag $SERVICE_NAME:$IMAGE_TAG $ECR_SECONDARY:$IMAGE_TAG
 
-            # Push to both regions
             docker push $ECR_PRIMARY:$IMAGE_TAG
             docker push $ECR_SECONDARY:$IMAGE_TAG
           '''
@@ -163,14 +166,12 @@ pipeline {
           sh '''
             export KUBECONFIG=$KUBECONFIG_FILE
 
-            # Deploy Prometheus + Grafana manifests if present
             if [ -d monitoring ]; then
               kubectl apply -f monitoring/
             else
               echo "No monitoring/ manifests found; skipping"
             fi
 
-            # CPU-based predictive scaling
             CPU=$(kubectl top pod $SERVICE_NAME --no-headers 2>/dev/null | awk '{print $2}' | sed 's/%//')
             if [ -n "$CPU" ] && [ "$CPU" -gt 80 ]; then
               echo "CPU usage high ($CPU%), scaling up..."
