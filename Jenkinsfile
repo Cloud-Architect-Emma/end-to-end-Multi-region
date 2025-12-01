@@ -26,7 +26,6 @@ pipeline {
   }
 
   stages {
-
     stage('Checkout') {
       steps {
         checkout([
@@ -136,16 +135,16 @@ pipeline {
           sh '''
             IMAGE_TAG=$(cut -d'=' -f2 .image_tag)
 
-            aws ecr describe-repositories --region ${AWS_DEFAULT_REGION}  --repository-names ${SERVICE_NAME} >/dev/null 2>&1 || \
-              aws ecr create-repository    --region ${AWS_DEFAULT_REGION}  --repository-name ${SERVICE_NAME}
-            aws ecr describe-repositories --region ${AWS_SECOND_REGION}   --repository-names ${SERVICE_NAME} >/dev/null 2>&1 || \
-              aws ecr create-repository    --region ${AWS_SECOND_REGION}   --repository-name ${SERVICE_NAME}
+            aws ecr describe-repositories --region ${AWS_DEFAULT_REGION} --repository-names ${SERVICE_NAME} >/dev/null 2>&1 || \
+              aws ecr create-repository --region ${AWS_DEFAULT_REGION} --repository-name ${SERVICE_NAME}
+            aws ecr describe-repositories --region ${AWS_SECOND_REGION} --repository-names ${SERVICE_NAME} >/dev/null 2>&1 || \
+              aws ecr create-repository --region ${AWS_SECOND_REGION} --repository-name ${SERVICE_NAME}
 
             aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_REG_PRIMARY}
-            aws ecr get-login-password --region ${AWS_SECOND_REGION}  | docker login --username AWS --password-stdin ${ECR_REG_SECONDARY}
+            aws ecr get-login-password --region ${AWS_SECOND_REGION} | docker login --username AWS --password-stdin ${ECR_REG_SECONDARY}
 
-            docker tag  ${SERVICE_NAME}:${IMAGE_TAG} ${ECR_PRIMARY}:${IMAGE_TAG}
-            docker tag  ${SERVICE_NAME}:${IMAGE_TAG} ${ECR_SECONDARY}:${IMAGE_TAG}
+            docker tag ${SERVICE_NAME}:${IMAGE_TAG} ${ECR_PRIMARY}:${IMAGE_TAG}
+            docker tag ${SERVICE_NAME}:${IMAGE_TAG} ${ECR_SECONDARY}:${IMAGE_TAG}
             docker push ${ECR_PRIMARY}:${IMAGE_TAG}
             docker push ${ECR_SECONDARY}:${IMAGE_TAG}
           '''
@@ -179,7 +178,6 @@ pipeline {
     }
   }
 
-
   post {
     success { echo "Pipeline completed successfully ✅" }
     failure { echo "Pipeline failed ❌" }
@@ -189,4 +187,4 @@ pipeline {
       }
     }
   }
-} // closes pipeline
+}  // <-- final closing brace for pipeline
