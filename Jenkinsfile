@@ -85,12 +85,12 @@ pipeline {
           env.IMAGE_TAG = "${params.BRANCH_NAME}-${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}"
         }
         sh '''
-          echo "IMAGE_TAG=$IMAGE_TAG" > .image_tag
+          echo "IMAGE_TAG=${IMAGE_TAG}" > .image_tag
 
           docker buildx version || true
           docker buildx create --use default || true
 
-          docker build -t $SERVICE_NAME:$IMAGE_TAG \
+          docker build -t ${SERVICE_NAME}:${IMAGE_TAG} \
             -f multi-region-project/microservices-demo/src/cartservice/Dockerfile \
             multi-region-project/microservices-demo/src/cartservice
         '''
@@ -102,7 +102,7 @@ pipeline {
         sh '''
           IMAGE_TAG=$(cut -d'=' -f2 .image_tag)
           if command -v syft >/dev/null 2>&1; then
-            syft $SERVICE_NAME:$IMAGE_TAG -o json > .sbom.json || true
+            syft ${SERVICE_NAME}:${IMAGE_TAG} -o json > .sbom.json || true
           else
             echo "Syft not installed in agent image; skipping SBOM"
           fi
@@ -115,7 +115,7 @@ pipeline {
         sh '''
           IMAGE_TAG=$(cut -d'=' -f2 .image_tag)
           if command -v trivy >/dev/null 2>&1; then
-            trivy image --exit-code 0 --severity CRITICAL,HIGH $SERVICE_NAME:$IMAGE_TAG || true
+            trivy image --exit-code 0 --severity CRITICAL,HIGH ${SERVICE_NAME}:${IMAGE_TAG} || true
           else
             echo "Trivy not installed in agent image; skipping scan"
           fi
@@ -136,18 +136,18 @@ pipeline {
           sh '''
             IMAGE_TAG=$(cut -d'=' -f2 .image_tag)
 
-            aws ecr describe-repositories --region $AWS_DEFAULT_REGION --repository-names $SERVICE_NAME >/dev/null 2>&1 || \
-              aws ecr create-repository --region $AWS_DEFAULT_REGION --repository-name $SERVICE_NAME
-            aws ecr describe-repositories --region $AWS_SECOND_REGION --repository-names $SERVICE_NAME >/dev/null 2>&1 || \
-              aws ecr create-repository --region $AWS_SECOND_REGION --repository-name $SERVICE_NAME
+            aws ecr describe-repositories --region ${AWS_DEFAULT_REGION}  --repository-names ${SERVICE_NAME} >/dev/null 2>&1 || \
+              aws ecr create-repository    --region ${AWS_DEFAULT_REGION}  --repository-name ${SERVICE_NAME}
+            aws ecr describe-repositories --region ${AWS_SECOND_REGION}   --repository-names ${SERVICE_NAME} >/dev/null 2>&1 || \
+              aws ecr create-repository    --region ${AWS_SECOND_REGION}   --repository-name ${SERVICE_NAME}
 
-            aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REG_PRIMARY
-            aws ecr get-login-password --region $AWS_SECOND_REGION  | docker login --username AWS --password-stdin $ECR_REG_SECONDARY
+            aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_REG_PRIMARY}
+            aws ecr get-login-password --region ${AWS_SECOND_REGION}  | docker login --username AWS --password-stdin ${ECR_REG_SECONDARY}
 
-            docker tag  $SERVICE_NAME:$IMAGE_TAG $ECR_PRIMARY:$IMAGE_TAG
-            docker tag  $SERVICE_NAME:$IMAGE_TAG $ECR_SECONDARY:$IMAGE_TAG
-            docker push $ECR_PRIMARY:$IMAGE_TAG
-            docker push $ECR_SECONDARY:$IMAGE_TAG
+            docker tag  ${SERVICE_NAME}:${IMAGE_TAG} ${ECR_PRIMARY}:${IMAGE_TAG}
+            docker tag  ${SERVICE_NAME}:${IMAGE_TAG} ${ECR_SECONDARY}:${IMAGE_TAG}
+            docker push ${ECR_PRIMARY}:${IMAGE_TAG}
+            docker push ${ECR_SECONDARY}:${IMAGE_TAG}
           '''
         }
       }
@@ -158,7 +158,7 @@ pipeline {
       steps {
         withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
           sh '''
-            export KUBECONFIG=$KUBECONFIG_FILE
+            export KUBECONFIG=${KUBECONFIG_FILE}
 
             if [ -d monitoring ]; then
               kubectl apply -f monitoring/
@@ -166,10 +166,10 @@ pipeline {
               echo "No monitoring/ manifests found; skipping"
             fi
 
-            CPU=$(kubectl top pod $SERVICE_NAME --no-headers 2>/dev/null | awk '{print \$2}' | sed 's/%//')
+            CPU=$(kubectl top pod ${SERVICE_NAME} --no-headers 2>/dev/null | awk '{print $2}' | sed 's/%//')
             if [ -n "$CPU" ] && [ "$CPU" -gt 80 ]; then
                 echo "CPU usage high ($CPU%), scaling up..."
-                kubectl scale deployment $SERVICE_NAME --replicas=3 || true
+                kubectl scale deployment ${SERVICE_NAME} --replicas=3 || true
             else
                 echo "CPU metric unavailable or below threshold; no scaling"
             fi
@@ -180,9 +180,10 @@ pipeline {
   }
 
   post {
-    success { echo "Pipeline completed successfully ✅" }
-    failure { echo "Pipeline failed ❌" }
-    always {
+  success { echo "Pipeline completed successfully ✅" }
+  failure { echo "Pipeline failed ❌" }
+  always {
+    script {
       archiveArtifacts artifacts: '.image_tag, .sbom.json', allowEmptyArchive: true
     }
   }
