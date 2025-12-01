@@ -85,8 +85,7 @@ pipeline {
         '''
       }
     }
-
-stage('Build Docker Image') {
+ stage('Build Docker Image') {
   steps {
     sh '''
       SHORT_SHA=$(git rev-parse --short HEAD)
