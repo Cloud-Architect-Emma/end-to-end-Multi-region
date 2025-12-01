@@ -185,9 +185,7 @@ pipeline {
         success { echo "Pipeline completed successfully ✅" }
         failure { echo "Pipeline failed ❌" }
         always {
-            node {
-                archiveArtifacts artifacts: '.image_tag, .sbom.json', allowEmptyArchive: true
-            }
+            archiveArtifacts artifacts: '.image_tag, .sbom.json', allowEmptyArchive: true
         }
     }
 }
