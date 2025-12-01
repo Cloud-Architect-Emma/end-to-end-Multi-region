@@ -99,9 +99,10 @@ pipeline {
           echo "IMAGE_TAG=$IMAGE_TAG" > .image_tag
           echo "Building image: $SERVICE_NAME:$IMAGE_TAG"
 
+          # Use relative path since repo is already checked out
           docker build -t "$SERVICE_NAME:$IMAGE_TAG" \
-            -f end-to-end-Multi-region/microservices-demo/src/cartservice/Dockerfile \
-            end-to-end-Multi-region/microservices-demo/src/cartservice/
+            -f microservices-demo/src/cartservice/Dockerfile \
+            microservices-demo/src/cartservice/
         '''
       }
     }
