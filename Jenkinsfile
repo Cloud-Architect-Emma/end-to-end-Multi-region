@@ -178,19 +178,6 @@ pipeline {
     }
   }
 
-post {
-    success { echo "Pipeline completed successfully ✅" }
-    failure { echo "Pipeline failed ❌" }
-    always {
-      script {
-        archiveArtifacts artifacts: '.image_tag, .sbom.json', allowEmptyArchive: true
-      }
-    }
-  }
-} 
-
-
-
   post {
     success { echo "Pipeline completed successfully ✅" }
     failure { echo "Pipeline failed ❌" }
@@ -200,4 +187,4 @@ post {
       }
     }
   }
-}  // final closing brace for pipeline
+}  // closes pipeline
