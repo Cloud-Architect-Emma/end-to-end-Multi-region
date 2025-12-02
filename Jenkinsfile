@@ -212,24 +212,37 @@ stage('Deploy to EKS') {
 
 stage('Monitoring ServiceAccounts') {
   steps {
-    withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+    withCredentials([
+      file(credentialsId: 'kubeconfig.yaml', variable: 'KUBECONFIG_FILE'),
+      string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
+      string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+    ]) {
       sh '''
         export KUBECONFIG=$KUBECONFIG_FILE
+        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+        export AWS_DEFAULT_REGION=us-east-1
+
+        aws sts get-caller-identity   # sanity check
         kubectl apply -f manifests/monitoring/serviceaccounts.yaml
       '''
     }
   }
 }
 
-
-
-
-
 stage('Monitoring RBAC') {
   steps {
-    withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+    withCredentials([
+      file(credentialsId: 'kubeconfig.yaml', variable: 'KUBECONFIG_FILE'),
+      string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
+      string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+    ]) {
       sh '''
         export KUBECONFIG=$KUBECONFIG_FILE
+        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+        export AWS_DEFAULT_REGION=us-east-1
+
         kubectl apply -f manifests/monitoring/rbac.yaml
       '''
     }
@@ -238,16 +251,22 @@ stage('Monitoring RBAC') {
 
 stage('Monitoring Datasource') {
   steps {
-    withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+    withCredentials([
+      file(credentialsId: 'kubeconfig.yaml', variable: 'KUBECONFIG_FILE'),
+      string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
+      string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+    ]) {
       sh '''
         export KUBECONFIG=$KUBECONFIG_FILE
+        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+        export AWS_DEFAULT_REGION=us-east-1
+
         kubectl apply -f manifests/monitoring/grafana-datasource.yaml
       '''
     }
   }
 }
-
-
 
 
     stage('Observability & Predictive Scaling') {
