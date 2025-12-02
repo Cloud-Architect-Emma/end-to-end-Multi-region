@@ -149,39 +149,21 @@ stage('Update Trivy DB') {
 
 
 
-stage('Push to ECR Multi-Region') {
+    
+    stage('Build Docker Image') {
   steps {
-    withCredentials([
-      string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
-      string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
-    ]) {
-      script {
-        env.AWS_ACCOUNT_ID = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
-        env.ECR_PRIMARY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${SERVICE_NAME}"
-        env.ECR_SECONDARY  = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_SECOND_REGION}.amazonaws.com/${SERVICE_NAME}"
-      }
-      sh '''
-        IMAGE_TAG=$(cut -d'=' -f2 .image_tag)
+    script {
+      SHORT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+      IMAGE_TAG = "${params.BRANCH_NAME}-${BUILD_NUMBER}-${SHORT_SHA}"
 
-        # Ensure repos exist in both regions
-        aws ecr describe-repositories --repository-names $SERVICE_NAME --region $AWS_DEFAULT_REGION || \
-          aws ecr create-repository --repository-name $SERVICE_NAME --region $AWS_DEFAULT_REGION
+      sh """
+        echo "IMAGE_TAG=$IMAGE_TAG" > .image_tag
+        echo "Building image: $SERVICE_NAME:$IMAGE_TAG"
 
-        aws ecr describe-repositories --repository-names $SERVICE_NAME --region $AWS_SECOND_REGION || \
-          aws ecr create-repository --repository-name $SERVICE_NAME --region $AWS_SECOND_REGION
-
-        # Login and push
-        aws ecr get-login-password --region $AWS_DEFAULT_REGION | \
-          docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
-
-        aws ecr get-login-password --region $AWS_SECOND_REGION | \
-          docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_SECOND_REGION}.amazonaws.com
-
-        docker tag $SERVICE_NAME:$IMAGE_TAG $ECR_PRIMARY:$IMAGE_TAG
-        docker tag $SERVICE_NAME:$IMAGE_TAG $ECR_SECONDARY:$IMAGE_TAG
-        docker push $ECR_PRIMARY:$IMAGE_TAG
-        docker push $ECR_SECONDARY:$IMAGE_TAG
-      '''
+        docker build -t "$SERVICE_NAME:$IMAGE_TAG" \
+          -f muti-region-project/microservices-demo/src/cartservice/Dockerfile \
+          muti-region-project/microservices-demo/src/cartservice/
+      """
     }
   }
 }
