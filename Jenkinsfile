@@ -109,7 +109,6 @@ stage('Build Docker Image') {
 
 
 
-
     stage('Generate SBOM (Syft)') {
       steps {
         sh '''
