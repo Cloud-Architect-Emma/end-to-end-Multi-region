@@ -163,6 +163,14 @@ stage('Push to ECR Multi-Region') {
       sh '''
         IMAGE_TAG=$(cut -d'=' -f2 .image_tag)
 
+        # Ensure repos exist in both regions
+        aws ecr describe-repositories --repository-names $SERVICE_NAME --region $AWS_DEFAULT_REGION || \
+          aws ecr create-repository --repository-name $SERVICE_NAME --region $AWS_DEFAULT_REGION
+
+        aws ecr describe-repositories --repository-names $SERVICE_NAME --region $AWS_SECOND_REGION || \
+          aws ecr create-repository --repository-name $SERVICE_NAME --region $AWS_SECOND_REGION
+
+        # Login and push
         aws ecr get-login-password --region $AWS_DEFAULT_REGION | \
           docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
 
@@ -171,14 +179,12 @@ stage('Push to ECR Multi-Region') {
 
         docker tag $SERVICE_NAME:$IMAGE_TAG $ECR_PRIMARY:$IMAGE_TAG
         docker tag $SERVICE_NAME:$IMAGE_TAG $ECR_SECONDARY:$IMAGE_TAG
-
         docker push $ECR_PRIMARY:$IMAGE_TAG
         docker push $ECR_SECONDARY:$IMAGE_TAG
       '''
     }
   }
 }
-
 
 
     stage('Observability & Predictive Scaling') {
