@@ -20,7 +20,7 @@ pipeline {
 
   stages {
 
-    stage('Checkout') {
+    stage('Checkout SCM') {
       steps {
         checkout([
           $class: 'GitSCM',
@@ -33,7 +33,7 @@ pipeline {
       }
     }
 
-    stage('Tooling check') {
+    stage('Tooling Check') {
       steps {
         sh '''
           which docker || { echo "docker not found"; exit 1; }
@@ -87,39 +87,33 @@ pipeline {
 
     stage('Build Docker Image') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-          sh '''
-            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+        script {
+          SHORT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+          IMAGE_TAG = "${params.BRANCH_NAME}-${BUILD_NUMBER}-${SHORT_SHA}"
 
-            SHORT_SHA=$(git rev-parse --short HEAD)
-            IMAGE_TAG="${BRANCH_NAME}-${BUILD_NUMBER}-${SHORT_SHA}"
-
+          sh """
             echo "IMAGE_TAG=$IMAGE_TAG" > .image_tag
             echo "Building image: $SERVICE_NAME:$IMAGE_TAG"
 
             docker build -t "$SERVICE_NAME:$IMAGE_TAG" \
               -f muti-region-project/microservices-demo/src/cartservice/Dockerfile \
               muti-region-project/microservices-demo/src/cartservice/
-          '''
+          """
         }
       }
     }
 
-
-
-stage('Update Trivy DB') {
-  steps {
-    sh '''
-      if command -v trivy >/dev/null 2>&1; then
-        trivy image --refresh alpine:3.19 || true
-      else
-        echo "Trivy not installed; skipping DB update"
-      fi
-    '''
-  }
-}
-
-
+    stage('Update Trivy DB') {
+      steps {
+        sh '''
+          if command -v trivy >/dev/null 2>&1; then
+            trivy image --refresh alpine:3.19 || true
+          else
+            echo "Trivy not installed; skipping DB update"
+          fi
+        '''
+      }
+    }
 
     stage('Generate SBOM (Syft)') {
       steps {
@@ -147,26 +141,75 @@ stage('Update Trivy DB') {
       }
     }
 
+    stage('Push to ECR Multi-Region') {
+      steps {
+        withCredentials([
+          string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
+          string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+        ]) {
+          script {
+            env.AWS_ACCOUNT_ID = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
+            env.ECR_PRIMARY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${SERVICE_NAME}"
+            env.ECR_SECONDARY  = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_SECOND_REGION}.amazonaws.com/${SERVICE_NAME}"
+          }
+          sh '''
+            IMAGE_TAG=$(cut -d'=' -f2 .image_tag)
+
+            # Ensure repos exist
+            aws ecr describe-repositories --repository-names $SERVICE_NAME --region $AWS_DEFAULT_REGION || \
+              aws ecr create-repository --repository-name $SERVICE_NAME --region $AWS_DEFAULT_REGION
+
+            aws ecr describe-repositories --repository-names $SERVICE_NAME --region $AWS_SECOND_REGION || \
+              aws ecr create-repository --repository-name $SERVICE_NAME --region $AWS_SECOND_REGION
+
+            # Login and push
+            aws ecr get-login-password --region $AWS_DEFAULT_REGION | \
+              docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
+
+            aws ecr get-login-password --region $AWS_SECOND_REGION | \
+              docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_SECOND_REGION}.amazonaws.com
+
+            docker tag $SERVICE_NAME:$IMAGE_TAG $ECR_PRIMARY:$IMAGE_TAG
+            docker tag $SERVICE_NAME:$IMAGE_TAG $ECR_SECONDARY:$IMAGE_TAG
+            docker push $ECR_PRIMARY:$IMAGE_TAG
+            docker push $ECR_SECONDARY:$IMAGE_TAG
+          '''
+        }
+      }
+    }
 
 
-    
-    stage('Build Docker Image') {
+
+
+
+stage('Deploy to EKS') {
+  when { expression { params.DEPLOY_TO_K8S } }
   steps {
-    script {
-      SHORT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-      IMAGE_TAG = "${params.BRANCH_NAME}-${BUILD_NUMBER}-${SHORT_SHA}"
+    withCredentials([
+      string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
+      string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+    ]) {
+      sh '''
+        IMAGE_TAG=$(cut -d'=' -f2 .image_tag)
 
-      sh """
-        echo "IMAGE_TAG=$IMAGE_TAG" > .image_tag
-        echo "Building image: $SERVICE_NAME:$IMAGE_TAG"
+        # Configure kubeconfig for your EKS cluster in us-east-1
+        aws eks update-kubeconfig --region us-east-1 --name multi-region
 
-        docker build -t "$SERVICE_NAME:$IMAGE_TAG" \
-          -f muti-region-project/microservices-demo/src/cartservice/Dockerfile \
-          muti-region-project/microservices-demo/src/cartservice/
-      """
+        echo "Deploying $SERVICE_NAME:$IMAGE_TAG to EKS cluster 'multi-region' in us-east-1..."
+
+        # Update deployment image
+        kubectl set image deployment/$SERVICE_NAME \
+          $SERVICE_NAME=${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/$SERVICE_NAME:$IMAGE_TAG \
+          --record
+
+        # Wait for rollout to complete
+        kubectl rollout status deployment/$SERVICE_NAME --timeout=180s
+      '''
     }
   }
 }
+
+
 
 
     stage('Observability & Predictive Scaling') {
