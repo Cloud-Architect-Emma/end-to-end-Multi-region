@@ -85,32 +85,25 @@ pipeline {
       }
     }
 
+    stage('Build Docker Image') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'emma2323', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+          sh '''
+            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
+            SHORT_SHA=$(git rev-parse --short HEAD)
+            IMAGE_TAG="${BRANCH_NAME}-${BUILD_NUMBER}-${SHORT_SHA}"
 
-stage('Build Docker Image') {
-  steps {
-    withCredentials([usernamePassword(credentialsId: 'emma2323', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-      sh '''
-        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+            echo "IMAGE_TAG=$IMAGE_TAG" > .image_tag
+            echo "Building image: $SERVICE_NAME:$IMAGE_TAG"
 
-        SHORT_SHA=$(git rev-parse --short HEAD)
-        IMAGE_TAG="${BRANCH_NAME}-${BUILD_NUMBER}-${SHORT_SHA}"
-
-        echo "IMAGE_TAG=$IMAGE_TAG" > .image_tag
-        echo "Building image: $SERVICE_NAME:$IMAGE_TAG"
-
-        docker build -t "$SERVICE_NAME:$IMAGE_TAG" \
-          -f muti-region-project/microservices-demo/src/cartservice/Dockerfile \
-          muti-region-project/microservices-demo/src/cartservice/
-      '''
+            docker build -t "$SERVICE_NAME:$IMAGE_TAG" \
+              -f muti-region-project/microservices-demo/src/cartservice/Dockerfile \
+              muti-region-project/microservices-demo/src/cartservice/
+          '''
+        }
+      }
     }
-  }
-}
-
-
-
-
-
 
     stage('Generate SBOM (Syft)') {
       steps {
@@ -138,38 +131,36 @@ stage('Build Docker Image') {
       }
     }
 
-    stage('Push to ECR Multi-Region') {
-      steps {
-        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
-          script {
-            env.AWS_ACCOUNT_ID = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
-            env.ECR_PRIMARY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${SERVICE_NAME}"
-            env.ECR_SECONDARY  = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_SECOND_REGION}.amazonaws.com/${SERVICE_NAME}"
-          }
-          sh '''
-            IMAGE_TAG=$(cut -d'=' -f2 .image_tag)
 
-            aws ecr describe-repositories --region $AWS_DEFAULT_REGION --repository-names $SERVICE_NAME >/dev/null 2>&1 || \
-              aws ecr create-repository --region $AWS_DEFAULT_REGION --repository-name $SERVICE_NAME
 
-            aws ecr describe-repositories --region $AWS_SECOND_REGION --repository-names $SERVICE_NAME >/dev/null 2>&1 || \
-              aws ecr create-repository --region $AWS_SECOND_REGION --repository-name $SERVICE_NAME
 
-            aws ecr get-login-password --region $AWS_DEFAULT_REGION | \
-              docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
-
-            aws ecr get-login-password --region $AWS_SECOND_REGION | \
-              docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_SECOND_REGION}.amazonaws.com
-
-            docker tag $SERVICE_NAME:$IMAGE_TAG $ECR_PRIMARY:$IMAGE_TAG
-            docker tag $SERVICE_NAME:$IMAGE_TAG $ECR_SECONDARY:$IMAGE_TAG
-
-            docker push $ECR_PRIMARY:$IMAGE_TAG
-            docker push $ECR_SECONDARY:$IMAGE_TAG
-          '''
-        }
+stage('Push to ECR Multi-Region') {
+  steps {
+    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+      script {
+        env.AWS_ACCOUNT_ID = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
+        env.ECR_PRIMARY    = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${SERVICE_NAME}"
+        env.ECR_SECONDARY  = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_SECOND_REGION}.amazonaws.com/${SERVICE_NAME}"
       }
+      sh '''
+        IMAGE_TAG=$(cut -d'=' -f2 .image_tag)
+        aws ecr get-login-password --region $AWS_DEFAULT_REGION | \
+          docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
+        aws ecr get-login-password --region $AWS_SECOND_REGION | \
+          docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_SECOND_REGION}.amazonaws.com
+        docker tag $SERVICE_NAME:$IMAGE_TAG $ECR_PRIMARY:$IMAGE_TAG
+        docker tag $SERVICE_NAME:$IMAGE_TAG $ECR_SECONDARY:$IMAGE_TAG
+        docker push $ECR_PRIMARY:$IMAGE_TAG
+        docker push $ECR_SECONDARY:$IMAGE_TAG
+      '''
     }
+  }
+}
+
+
+
+
+
 
     stage('Observability & Predictive Scaling') {
       when { expression { params.DEPLOY_TO_K8S } }
@@ -196,7 +187,6 @@ stage('Build Docker Image') {
       }
     }
 
-
     stage('Cleanup Docker Images') {
       steps {
         sh '''
@@ -214,10 +204,10 @@ stage('Build Docker Image') {
         '''
       }
     }
-  }   // <-- closes the stages block
+  }
 
   post {
     success { echo "Pipeline completed successfully ✅" }
     failure { echo "Pipeline failed ❌" }
   }
-}     // <-- closes the pipeline block
+}
