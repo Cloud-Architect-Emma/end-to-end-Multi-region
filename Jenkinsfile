@@ -85,11 +85,12 @@ pipeline {
       }
     }
 
+
+
 stage('Build Docker Image') {
   steps {
-    withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+    withCredentials([usernamePassword(credentialsId: 'emma2323', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
       sh '''
-        # Log in to Docker Hub using Jenkins credentials
         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
         SHORT_SHA=$(git rev-parse --short HEAD)
@@ -105,6 +106,10 @@ stage('Build Docker Image') {
     }
   }
 }
+
+
+
+
 
 
     stage('Generate SBOM (Syft)') {
