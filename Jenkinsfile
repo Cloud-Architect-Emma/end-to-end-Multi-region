@@ -210,6 +210,30 @@ stage('Deploy to EKS') {
 }
 
 
+
+stage('Monitoring Namespace') {
+  steps {
+    withCredentials([
+      file(credentialsId: 'kubeconfig.yaml', variable: 'KUBECONFIG_FILE'),
+      string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
+      string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+    ]) {
+      sh '''
+        export KUBECONFIG=$KUBECONFIG_FILE
+        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+        export AWS_DEFAULT_REGION=us-east-1
+
+        kubectl apply -f manifests/monitoring/namespace.yaml
+      '''
+    }
+  }
+}
+
+
+
+
+
 stage('Monitoring ServiceAccounts') {
   steps {
     withCredentials([
