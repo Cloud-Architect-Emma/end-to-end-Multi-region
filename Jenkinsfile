@@ -210,6 +210,44 @@ stage('Deploy to EKS') {
 }
 
 
+stage('Monitoring ServiceAccounts') {
+  steps {
+    withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+      sh '''
+        export KUBECONFIG=$KUBECONFIG_FILE
+        kubectl apply -f manifests/monitoring/serviceaccounts.yaml
+      '''
+    }
+  }
+}
+
+
+
+
+
+stage('Monitoring RBAC') {
+  steps {
+    withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+      sh '''
+        export KUBECONFIG=$KUBECONFIG_FILE
+        kubectl apply -f manifests/monitoring/rbac.yaml
+      '''
+    }
+  }
+}
+
+stage('Monitoring Datasource') {
+  steps {
+    withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+      sh '''
+        export KUBECONFIG=$KUBECONFIG_FILE
+        kubectl apply -f manifests/monitoring/grafana-datasource.yaml
+      '''
+    }
+  }
+}
+
+
 
 
     stage('Observability & Predictive Scaling') {
