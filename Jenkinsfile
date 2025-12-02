@@ -85,25 +85,31 @@ pipeline {
       }
     }
 
-    stage('Build Docker Image') {
-      steps {
-        withCredentials([usernamePassword(credentialsId: 'emma2323', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-          sh '''
-            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-            SHORT_SHA=$(git rev-parse --short HEAD)
-            IMAGE_TAG="${BRANCH_NAME}-${BUILD_NUMBER}-${SHORT_SHA}"
 
-            echo "IMAGE_TAG=$IMAGE_TAG" > .image_tag
-            echo "Building image: $SERVICE_NAME:$IMAGE_TAG"
 
-            docker build -t "$SERVICE_NAME:$IMAGE_TAG" \
-              -f muti-region-project/microservices-demo/src/cartservice/Dockerfile \
-              muti-region-project/microservices-demo/src/cartservice/
-          '''
-        }
-      }
+stage('Build Docker Image') {
+  steps {
+    withCredentials([usernamePassword(credentialsId: 'emma2323', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+      sh '''
+        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
+        SHORT_SHA=$(git rev-parse --short HEAD)
+        IMAGE_TAG="${BRANCH_NAME}-${BUILD_NUMBER}-${SHORT_SHA}"
+
+        echo "IMAGE_TAG=$IMAGE_TAG" > .image_tag
+        echo "Building image: $SERVICE_NAME:$IMAGE_TAG"
+
+        docker build -t "$SERVICE_NAME:$IMAGE_TAG" \
+          -f muti-region-project/microservices-demo/src/cartservice/Dockerfile \
+          muti-region-project/microservices-demo/src/cartservice/
+      '''
     }
+  }
+}
+
+
+
 
     stage('Generate SBOM (Syft)') {
       steps {
