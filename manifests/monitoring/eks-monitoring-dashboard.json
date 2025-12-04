@@ -1,0 +1,52 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "EKS Monitoring Dashboard",
+    "tags": ["eks", "prometheus", "monitoring"],
+    "timezone": "browser",
+    "schemaVersion": 36,
+    "version": 1,
+    "panels": [
+      {
+        "type": "timeseries",
+        "title": "Cluster CPU Usage",
+        "targets": [
+          {
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace!=\"\",container!=\"\"}[5m]))",
+            "legendFormat": "CPU Usage"
+          }
+        ]
+      },
+      {
+        "type": "timeseries",
+        "title": "Cluster Memory Usage",
+        "targets": [
+          {
+            "expr": "sum(container_memory_usage_bytes{namespace!=\"\",container!=\"\"})",
+            "legendFormat": "Memory Usage"
+          }
+        ]
+      },
+      {
+        "type": "stat",
+        "title": "Pod Restarts",
+        "targets": [
+          {
+            "expr": "sum(kube_pod_container_status_restarts_total)",
+            "legendFormat": "Restarts"
+          }
+        ]
+      },
+      {
+        "type": "gauge",
+        "title": "Node Count",
+        "targets": [
+          {
+            "expr": "count(kube_node_info)",
+            "legendFormat": "Nodes"
+          }
+        ]
+      }
+    ]
+  }
+}

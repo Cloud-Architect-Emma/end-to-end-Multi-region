@@ -20,10 +20,21 @@ repos:
   # ----------------------------
   # Kubernetes / Helm linting
   # ----------------------------
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+
   - repo: https://github.com/stackrox/kube-linter
-    rev: v0.7.6
+    rev: v0.6.6
     hooks:
       - id: kube-linter
+        args: [ "lint", "manifests/monitoring/" ]
+
+
 
   # ----------------------------
   # Security scanning (Checkov, Gitleaks)

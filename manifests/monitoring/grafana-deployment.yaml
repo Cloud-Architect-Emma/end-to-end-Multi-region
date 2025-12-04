@@ -13,20 +13,21 @@ spec:
       labels:
         app: grafana
     spec:
-      serviceAccountName: grafana
       containers:
       - name: grafana
-        image: grafana/grafana:10.4.0
+        image: 430118830222.dkr.ecr.us-east-1.amazonaws.com/grafana:11.0.0   # ✅ ECR URI
         ports:
         - containerPort: 3000
-        securityContext:
-          readOnlyRootFilesystem: true
-          runAsNonRoot: true
-          runAsUser: 1000
-        resources:
-          requests:
-            cpu: "250m"
-            memory: "512Mi"
-          limits:
-            cpu: "500m"
-            memory: "1Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  type: LoadBalancer
+  selector:
+    app: grafana
+  ports:
+  - port: 3000
+    targetPort: 3000
