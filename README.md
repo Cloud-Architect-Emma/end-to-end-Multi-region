@@ -78,7 +78,7 @@ This project implements a **3-Tier Multi-Region Cloud-Native Platform** with **C
 ---
 
 ## End‑to‑End Architecture Diagram
-![Architecture Diagram](project-screenshot/end‑to‑end architecture diagram.PNG).
+![Architecture Diagram](project-screenshot/architecture-diagram.PNG).
 
 
 **Multi-Region Deployment:**  
@@ -87,9 +87,8 @@ The application is deployed across multiple AWS regions using Terraform modules 
 ---
 
 ## CI/CD Pipeline (Jenkins)
-![Architecture Diagram](project-screenshot/end‑to‑end architecture diagram.PNG)  
-
-The pipeline automates **code quality checks, image building, security scanning, deployment, and monitoring**.
+ 
+ The pipeline automates **code quality checks, image building, security scanning, deployment, and monitoring**.
 
 ## Pipeline Screenshot
 ![Pipeline Screenshot ](project-screenshot/Jenkins-pipeline.PNG)
