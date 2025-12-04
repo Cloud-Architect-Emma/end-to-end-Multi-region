@@ -78,7 +78,7 @@ This project implements a **3-Tier Multi-Region Cloud-Native Platform** with **C
 ---
 
 ## End‑to‑End Architecture Diagram
-![Architecture Diagram](project-screenshot/end‑to‑end architecture diagram.PNG)  
+![Architecture Diagram](project-screenshot/end‑to‑end architecture diagram.PNG).
 
 
 **Multi-Region Deployment:**  
